@@ -14,80 +14,11 @@ USAGE
 
 import numpy as np
 import cv2
-import os
-import time
-#from common import anorm, getsize
+from common import anorm, getsize
 
 FLANN_INDEX_KDTREE = 1  # bug: flann enums are missing
 FLANN_INDEX_LSH    = 6
-files = []
-matcher = None
 
-def get_image(image_path):
-	return cv2.imread(image_path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
-
-def get_image_features(image):
-	# Workadound for missing interfaces
-	surf = cv2.FeatureDetector_create("SURF")
-	surf.setInt("hessianThreshold", 100)
-	surf_extractor = cv2.DescriptorExtractor_create("SURF")
-	# Get keypoints from image
-	keypoints = surf.detect(image, None)
-	# Get keypoint descriptors for found keypoints
-	keypoints, descriptors = surf_extractor.compute(image, keypoints)
-	return keypoints, numpy.array(descriptors)
-
-# create a matcher with a sequence of all descriptors of images.
-def train_index():
-	# Prepare FLANN matcher
-	#FLANN_INDEX_KDTREE = 0
-	#flann_params = dict(algorithm = 1, trees = 4)
-	flann_params = dict(algorithm = 1, trees = 5)
-	#search_params = dict(checks = 50)
-	matcher = cv2.FlannBasedMatcher(flann_params, {})
-	kps = []
-	dests = []
-	sizes = []
-
-	# Train FLANN matcher with descriptors of all images
-	for f in os.listdir("img/"):
-		# This step may produce a .DS_Store file in OS X system,Please remove the file in ./img folder.
-		print "Processing " + f
-
-		if f == ".DS_Store":
-			continue
-		image = get_image("./img/%s" % (f,))
-		imgSize = image.shape[:2]
-
-		#gray = [cv2.cvtColor(i, cv2.COLOR_BGR2GRAY) for i in image]
-		#gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-		#dst = cv2.fastNlMeansDenoisingMulti(image, 2, 5, None, 4, 7, 35)
-		keypoints, descriptors = get_image_features(image)
-		#!! matcher.add([descriptors])
-		kps.append(keypoints) #!!
-		dests.append(descriptors) #!!
-		files.append(f)
-		sizes.append(imgSize)
-
-	#!!print "Training FLANN."
-	#!!matcher.train()
-	#!!print "Done."
-	return matcher,kps,dests,sizes
-
-def filter_matches(kp1, kp2, matches, ratio = 0.75):
-    # kp1: keypoints of the first image
-    # kp2: keypoints of the second image
-    # matches: raw matches.
-    mkp1, mkp2 = [], []
-    for m in matches:
-        if len(m) == 2 and m[0].distance < m[1].distance * ratio:
-            m = m[0]
-            mkp1.append( kp1[m.queryIdx] )
-            mkp2.append( kp2[m.trainIdx] )
-    p1 = np.float32([kp.pt for kp in mkp1])
-    p2 = np.float32([kp.pt for kp in mkp2])
-    kp_pairs = zip(mkp1, mkp2)
-    return p1, p2, kp_pairs
 
 def init_feature(name):
     chunks = name.split('-')
@@ -117,9 +48,6 @@ def init_feature(name):
 
 
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
-    # kp1: keypoints of the first image
-    # kp2: keypoints of the second image
-    # matches: raw matches.
     mkp1, mkp2 = [], []
     for m in matches:
         if len(m) == 2 and m[0].distance < m[1].distance * ratio:
@@ -131,7 +59,7 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
     kp_pairs = zip(mkp1, mkp2)
     return p1, p2, kp_pairs
 
-def explore_match(size, kp_pairs, status = None, H = None):
+def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     vis = np.zeros((max(h1, h2), w1+w2), np.uint8)
@@ -142,7 +70,6 @@ def explore_match(size, kp_pairs, status = None, H = None):
     if H is not None:
         corners = np.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
         corners = np.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
-        print "corners : " , corners
         cv2.polylines(vis, [corners], True, (255, 255, 255))
 
     if status is None:
@@ -172,33 +99,31 @@ def explore_match(size, kp_pairs, status = None, H = None):
         if inlier:
             cv2.line(vis, (x1, y1), (x2, y2), green)
 
-    #cv2.imshow(win, vis)
-    # def onmouse(event, x, y, flags, param):
-    #     cur_vis = vis
-    #     if flags & cv2.EVENT_FLAG_LBUTTON:
-    #         cur_vis = vis0.copy()
-    #         r = 8
-    #         m = (anorm(p1 - (x, y)) < r) | (anorm(p2 - (x, y)) < r)
-    #         idxs = np.where(m)[0]
-    #         kp1s, kp2s = [], []
-    #         for i in idxs:
-    #              (x1, y1), (x2, y2) = p1[i], p2[i]
-    #              col = (red, green)[status[i]]
-    #              cv2.line(cur_vis, (x1, y1), (x2, y2), col)
-    #              kp1, kp2 = kp_pairs[i]
-    #              kp1s.append(kp1)
-    #              kp2s.append(kp2)
-    #         cur_vis = cv2.drawKeypoints(cur_vis, kp1s, flags=4, color=kp_color)
-    #         cur_vis[:,w1:] = cv2.drawKeypoints(cur_vis[:,w1:], kp2s, flags=4, color=kp_color)
-    #
-    #     cv2.imshow(win, cur_vis)
-    # cv2.setMouseCallback(win, onmouse)
+    cv2.imshow(win, vis)
+    def onmouse(event, x, y, flags, param):
+        cur_vis = vis
+        if flags & cv2.EVENT_FLAG_LBUTTON:
+            cur_vis = vis0.copy()
+            r = 8
+            m = (anorm(p1 - (x, y)) < r) | (anorm(p2 - (x, y)) < r)
+            idxs = np.where(m)[0]
+            kp1s, kp2s = [], []
+            for i in idxs:
+                 (x1, y1), (x2, y2) = p1[i], p2[i]
+                 col = (red, green)[status[i]]
+                 cv2.line(cur_vis, (x1, y1), (x2, y2), col)
+                 kp1, kp2 = kp_pairs[i]
+                 kp1s.append(kp1)
+                 kp2s.append(kp2)
+            cur_vis = cv2.drawKeypoints(cur_vis, kp1s, flags=4, color=kp_color)
+            cur_vis[:,w1:] = cv2.drawKeypoints(cur_vis[:,w1:], kp2s, flags=4, color=kp_color)
+
+        cv2.imshow(win, cur_vis)
+    cv2.setMouseCallback(win, onmouse)
     return vis
 
 
 if __name__ == '__main__':
-
-    print "OpenCV Demo, OpenCV version " + cv2.__version__
     print __doc__
 
     import sys, getopt
@@ -207,16 +132,12 @@ if __name__ == '__main__':
     feature_name = opts.get('--feature', 'sift')
     try: fn1, fn2 = args
     except:
-        #fn1 = '../c/box.png'
-        #fn2 = '../c/box_in_scene.png'
-        fn1 = 'ad007.jpg'
-        fn2 = 't007.jpg' #test
+        fn1 = '../c/box.png'
+        fn2 = '../c/box_in_scene.png'
 
     img1 = cv2.imread(fn1, 0)
     img2 = cv2.imread(fn2, 0)
-    size = img2.shape[:2]
-    print "size : " ,size
-    detector, matcher = init_feature(feature_name) #create detector and matcher object
+    detector, matcher = init_feature(feature_name)
     if detector != None:
         print 'using', feature_name
     else:
@@ -242,22 +163,5 @@ if __name__ == '__main__':
         vis = explore_match(win, img1, img2, kp_pairs, status, H)
 
     match_and_draw('find_obj')
-
-    # ===========================================================================
-
-    start_time = time.time()
-    flann_matcher, kps, dests, sizes = train_index()  # get matcher with a sequence of desciptors #!!
-    kp_and_dest_pairs = zip(kps, dests, sizes, files)
-    # print kp_and_dest_pairs
-
-    print "\nIndex generation took ", (time.time() - start_time), "s.\n"
-    # ======================== Training done, image matching here ===============
-
-    FLANN_INDEX_KDTREE = 1
-    flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    matcher = cv2.FlannBasedMatcher(flann_params, {})
-
-    start_time = time.time()
-    match_image("t3.jpg", flann_matcher, kp_and_dest_pairs)
-    print "Matching took", (time.time() - start_time), "s."
     cv2.waitKey()
+    cv2.destroyAllWindows()
