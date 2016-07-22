@@ -246,6 +246,8 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 	trainImgHeight = trainImgSize[0]
 	trainImgWidth = trainImgSize[1]
 
+	red = (0, 0, 255)
+
 	corners = numpy.float32([[0,0],[trainImgWidth,0],[trainImgWidth,trainImgHeight],[0,trainImgHeight]])
 
 	raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors,2)
@@ -273,7 +275,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			vis = numpy.zeros((queryImgHeight, queryImgWidth), numpy.uint8)
 			vis[:queryImgHeight, :queryImgWidth] = queryImage
 			vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
-			cv2.polylines(vis, [obj_corners], True, (0, 0, 255))
+			cv2.polylines(vis, [obj_corners], True, red)
 			is_polygon = ispolygon(obj_corners)
 
 			if is_polygon:
@@ -309,9 +311,8 @@ def cosVector(x,y):
 		# print "result3 = ",result3
 		# print("result is "+str(cosVec))
 		cosVec = result1 / ((result2 * result3) ** 0.5)
+		print "cosVec = ", cosVec
 		return cosVec
-
-
 
 def vector(p1,p2):
 
