@@ -15,7 +15,7 @@ def get_image(image_path):
 def get_image_features(image):
 	# Workadound for missing interfaces
 	surf = cv2.FeatureDetector_create("SURF")
-	surf.setInt("hessianThreshold", 100)
+	surf.setInt("hessianThreshold", 8888)
 	surf_extractor = cv2.DescriptorExtractor_create("SURF")
 	# Get keypoints from image
 	keypoints = surf.detect(image, None)
@@ -68,12 +68,12 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
     for m in matches:
         if len(m) == 2 and m[0].distance < m[1].distance * ratio:
             m = m[0]
-            mkp1.append( kp1[m.queryIdx] )
-            mkp2.append( kp2[m.trainIdx] )
-    p1 = numpy.float32([kp.pt for kp in mkp1])
-    p2 = numpy.float32([kp.pt for kp in mkp2])
-    kp_pairs = zip(mkp1, mkp2)
-    return p1, p2, kp_pairs
+            mkp1.append( kp1[m.queryIdx].pt )
+            mkp2.append( kp2[m.trainIdx].pt )
+    p1 = numpy.float32(mkp1)
+    p2 = numpy.float32(mkp2)
+
+    return p1, p2
 
 def match_image(image, matcher, kp_and_dest_pairs):
 	# image:the image which is compared to match
@@ -157,6 +157,8 @@ def match_image(image, matcher, kp_and_dest_pairs):
 				print "This image may NOT be matched!"
 			#print math.sqrt((obj_corners[0].x - obj_corners[1].x) * (obj_corners[0].x - obj_corners[1].x) + (
 				#obj_corners[0].y - obj_corners[1].y) * (obj_corners[0].y - obj_corners[1].y))
+
+
 			cv2.imshow(kpd[3], vis)
 			cv2.waitKey()
 
@@ -251,7 +253,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 	corners = numpy.float32([[0,0],[trainImgWidth,0],[trainImgWidth,trainImgHeight],[0,trainImgHeight]])
 
 	raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors,2)
-	queryGoodPoints , trainGoodPoints, kp_pairs = filter_matches(trainKeypoints, queryKeypoints, raw_matches)
+	queryGoodPoints , trainGoodPoints = filter_matches(trainKeypoints, queryKeypoints, raw_matches)
 
 	if len(queryKeypoints) >= 4:
 		H, status = cv2.findHomography(queryGoodPoints, trainGoodPoints, cv2.RANSAC, 5.0)
@@ -287,7 +289,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
 
-def cosVector(x,y):
+def absCosVector(x,y):
 	l=len(x)
 	# len(x)
 	if(len(x)!=len(y)):
@@ -310,9 +312,9 @@ def cosVector(x,y):
 		# print "result2 = ",result2
 		# print "result3 = ",result3
 		# print("result is "+str(cosVec))
-		cosVec = result1 / ((result2 * result3) ** 0.5)
-		print "cosVec = ", cosVec
-		return cosVec
+		absCosVec = abs(result1 / ((result2 * result3) ** 0.5))
+		print "absCosVec = ", absCosVec
+		return absCosVec
 
 def vector(p1,p2):
 
@@ -326,12 +328,15 @@ def vector(p1,p2):
 		return
 
 def ispolygon(points):
-	vec1 = vector(points[0],points[1])
-	vec2 = vector(points[0],points[3])
-	vec3 = vector(points[1],points[2])
-	cos1 = cosVector(vec1,vec2)
-	cos2 = cosVector(vec1,vec3)
-	if cos1>-0.1 and cos1<0.1 and cos2>-0.1 and cos2<0.1:
+	vec1 = vector(points[0], points[1])
+	vec2 = vector(points[0], points[3])
+	vec3 = vector(points[1], points[2])
+	vec4 = vector(points[2], points[3])
+	absCos1 = absCosVector(vec1, vec2)
+	absCos2 = absCosVector(vec1, vec3)
+	absCos3 = absCosVector(vec1, vec4)
+	print "cos3 = " ,absCos3
+	if absCos1 < 0.17  and absCos2 < 0.17 and absCos3 <= 1 and absCos3 > 0.96:
 		print "This area is polygon-like."
 		return True
 	else:
@@ -383,6 +388,10 @@ if __name__ == "__main__":
 	trainKeypoints, trainDescriptors = get_image_features(trainImage)
 	trainImgSize = trainImage.shape[:2]
 	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "ad1.jpg"]
+
+	surf_extractor = cv2.DescriptorExtractor_create("SURF")
+
+  	bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
 
 	match(queryFeature,trainFeature, matcher, queryImage)
 
