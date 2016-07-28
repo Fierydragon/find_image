@@ -231,60 +231,6 @@ def match_image(image, matcher, kp_and_dest_pairs):
 #
 #     cv2.imshow(win, vis)
 
-def match(queryFeature, trainFeature, matcher, queryImage = None):
-	queryKeypoints = queryFeature[0]
-	queryDescriptors = queryFeature[1]
-	queryImgSize = queryFeature[2]
-	queryImageName = queryFeature[3]
-	queryImgHeight = queryImgSize[0]
-	queryImgWidth = queryImgSize[1]
-
-	trainKeypoints = trainFeature[0]
-	trainDescriptors = trainFeature[1]
-	trainImgSize = trainFeature[2]
-	trainImageName = trainFeature[3]
-	trainImgHeight = trainImgSize[0]
-	trainImgWidth = trainImgSize[1]
-
-	corners = numpy.float32([[0,0],[trainImgWidth,0],[trainImgWidth,trainImgHeight],[0,trainImgHeight]])
-
-	raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors,2)
-	queryGoodPoints , trainGoodPoints, kp_pairs = filter_matches(trainKeypoints, queryKeypoints, raw_matches)
-
-	if len(queryKeypoints) >= 4:
-		H, status = cv2.findHomography(queryGoodPoints, trainGoodPoints, cv2.RANSAC, 5.0)
-
-		print '%s: %d / %d  inliers/matched,and the matched points is p1 = %d p2 = %d' % (
-			trainImageName, numpy.sum(status), len(status), len(queryGoodPoints), len(trainGoodPoints))
-	else:
-		H, status = None, None
-		print '%d matches found, not enough for homography estimation' % len(trainKeypoints)
-
-	if H is not None:
-		corners = corners.reshape(1, -1, 2)
-		print  "corners : ", corners
-
-		obj_corners = numpy.int32(cv2.perspectiveTransform(corners, H).reshape(-1, 2))
-		print "obj = ", obj_corners
-
-
-		# =========== just for test ============
-		if queryImage != None:
-			vis = numpy.zeros((queryImgHeight, queryImgWidth), numpy.uint8)
-			vis[:queryImgHeight, :queryImgWidth] = queryImage
-			vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
-			cv2.polylines(vis, [obj_corners], True, (0, 0, 255))
-			is_polygon = ispolygon(obj_corners)
-
-			if is_polygon:
-				print "This image may be matched!"
-			else:
-				print "This image may NOT be matched!"
-		# print math.sqrt((obj_corners[0].x - obj_corners[1].x) * (obj_corners[0].x - obj_corners[1].x) + (
-		# obj_corners[0].y - obj_corners[1].y) * (obj_corners[0].y - obj_corners[1].y))
-			cv2.imshow(trainImageName, vis)
-			cv2.waitKey()
-
 def cosVector(x,y):
 	l=len(x)
 	# len(x)
@@ -350,9 +296,7 @@ if __name__ == "__main__":
 
 	start_time = time.time()
 	flann_matcher,kps,dests,sizes = train_index()  #get matcher with a sequence of desciptors #!!
-
 	kp_and_dest_pairs = zip(kps,dests,sizes,files)
-
 	#print kp_and_dest_pairs
 
 	print "\nIndex generation took ", (time.time() - start_time), "s.\n"
@@ -362,31 +306,15 @@ if __name__ == "__main__":
 	flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
 	matcher = cv2.FlannBasedMatcher(flann_params, {})
 
-	# surf = cv2.SURF()
-	# #surf = cv2.FeatureDetector_create("SURF")
-    #
-	# img1 = cv2.imread("tst.jpg", 0)
-	# img2 = cv2.imread("tst2.jpg", 0)
-	# kp1, desc1 = surf.detectAndCompute(img1, None)
-	# kp2, desc2 = surf.detectAndCompute(img2, None)
-	# raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
+	surf = cv2.SURF()
+	#surf = cv2.FeatureDetector_create("SURF")
 
-	# ======================================================
+	img1 = cv2.imread("tst.jpg", 0)
+	img2 = cv2.imread("tst2.jpg", 0)
+	kp1, desc1 = surf.detectAndCompute(img1, None)
+	kp2, desc2 = surf.detectAndCompute(img2, None)
+	raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
 
-	queryImage = get_image("t3.jpg")
-	queryKeypoints, queryDescriptors = get_image_features(queryImage)
-	queryImgSize = queryImage.shape[:2]
-	queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t3.jpg"]
-
-	trainImage = get_image("ad1.jpg")
-	trainKeypoints, trainDescriptors = get_image_features(trainImage)
-	trainImgSize = trainImage.shape[:2]
-	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "ad1.jpg"]
-
-	match(queryFeature,trainFeature, matcher, queryImage)
-
-
-	# ======================================================
 	start_time = time.time()
 
 	match_image("t3.jpg", flann_matcher, kp_and_dest_pairs)
