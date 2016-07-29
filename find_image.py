@@ -4,7 +4,7 @@ import os
 
 # Used for timing
 import time
-
+from common import anorm
 
 files = []
 matcher = None
@@ -34,6 +34,7 @@ def train_index():
 	kps = []
 	dests = []
 	sizes = []
+	images = []
 
 	# Train FLANN matcher with descriptors of all images
 	for f in os.listdir("img/"):
@@ -54,13 +55,29 @@ def train_index():
 		dests.append(descriptors) #!!
 		files.append(f)
 		sizes.append(imgSize)
+		images.append(image)
 
 	#!!print "Training FLANN."
 	#!!matcher.train()
 	#!!print "Done."
-	return matcher,kps,dests,sizes
+	return matcher,kps,dests,sizes,images
 
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
+    # kp1: keypoints of the first image
+    # kp2: keypoints of the second image
+    # matches: raw matches.
+    mkp1, mkp2 = [], []
+    for m in matches:
+        if len(m) == 2 and m[0].distance < m[1].distance * ratio:
+            m = m[0]
+            mkp1.append( kp1[m.queryIdx].pt )
+            mkp2.append( kp2[m.trainIdx].pt )
+    p1 = numpy.float32(mkp1)
+    p2 = numpy.float32(mkp2)
+
+    return p1, p2
+
+def m_and_d_filter_matches(kp1, kp2, matches, ratio = 0.75):
     # kp1: keypoints of the first image
     # kp2: keypoints of the second image
     # matches: raw matches.
@@ -73,36 +90,37 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
     p1 = numpy.float32([kp.pt for kp in mkp1])
     p2 = numpy.float32([kp.pt for kp in mkp2])
     kp_pairs = zip(mkp1, mkp2)
+
     return p1, p2, kp_pairs
 
 def match_image(image, matcher, kp_and_dest_pairs):
 	# image:the image which is compared to match
 	# kp_and_dest_pairs: the pairs of keypoints, descriptors, iamge sizes and fileName
 	# Get image descriptors
-	image = get_image(image)
-	keypoints, descriptors = get_image_features(image)
+	queryImage = get_image(image)
+	keypoints, descriptors = get_image_features(queryImage)
 
-	h2, w2 = image.shape[:2]
+	h2, w2 = queryImage.shape[:2]
 
 	for kpd in kp_and_dest_pairs:
 		imgSize = kpd[2]
 		h1 = numpy.int(imgSize[0])
 		w1 = numpy.int(imgSize[1])
-		# h2 = imgSize[0]
-		# w2 = imgSize[1]
+		trainImageName = kpd[3]
 		#
 		corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
 
-		print kpd[3]," : ",len(kpd[0])
+		print trainImageName," : ",len(kpd[0])
 		raw_matches = matcher.knnMatch(kpd[1], descriptors, 2)
-		p1, p2, kp_pairs = filter_matches(kpd[0], keypoints, raw_matches)
+		p1, p2 = filter_matches(kpd[0], keypoints, raw_matches)
 
 		#print '%s:' %kpd[2]
 
-		if len(p1) >= 4:
+		if len(p1) >= 25:
 			H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
 
-			print '%s: %d / %d  inliers/matched,and the matched points is p1 = %d p2 = %d' % (kpd[2],numpy.sum(status), len(status),len(p1),len(p2))
+			print "H: ", H
+			print '%s: %d / %d  inliers/matched,and the matched points is p1 = %d p2 = %d' % (kpd[2], numpy.sum(status), len(status),len(p1),len(p2))
 		else:
 			H, status = None, None
 			print '%d matches found, not enough for homography estimation' % len(p1)
@@ -119,7 +137,7 @@ def match_image(image, matcher, kp_and_dest_pairs):
 
 			# ================= just show the query image =================
 			vis = numpy.zeros((h2, w2), numpy.uint8)
-			vis[:h2, :w2] = image
+			vis[:h2, :w2] = queryImage
 			vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
 			cv2.polylines(vis, [obj_corners], True, (0, 0, 255))
 
@@ -157,7 +175,8 @@ def match_image(image, matcher, kp_and_dest_pairs):
 				print "This image may NOT be matched!"
 			#print math.sqrt((obj_corners[0].x - obj_corners[1].x) * (obj_corners[0].x - obj_corners[1].x) + (
 				#obj_corners[0].y - obj_corners[1].y) * (obj_corners[0].y - obj_corners[1].y))
-			cv2.imshow(kpd[3], vis)
+
+			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
 
 
@@ -189,47 +208,112 @@ def match_image(image, matcher, kp_and_dest_pairs):
 	# print "==========="
     #
 	# return matched_image
-# def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
-#     h1, w1 = img1.shape[:2]
-#     h2, w2 = img2.shape[:2]
-#     vis = numpy.zeros((max(h1, h2), w1+w2), numpy.uint8)
-#     vis[:h1, :w1] = img1
-#     vis[:h2, w1:w1+w2] = img2
-#     vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
-#
-#     if H is not None:
-#         corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
-#         corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
-#         cv2.polylines(vis, [corners], True, (255, 255, 255))
-#
-#     if status is None:
-#         status = numpy.ones(len(kp_pairs), numpy.bool_)
-#     p1 = numpy.int32([kpp[0].pt for kpp in kp_pairs])
-#     p2 = numpy.int32([kpp[1].pt for kpp in kp_pairs]) + (w1, 0)
-#
-#     green = (0, 255, 0)
-#     red = (0, 0, 255)
-#     white = (255, 255, 255)
-#     kp_color = (51, 103, 236)
-#     for (x1, y1), (x2, y2), inlier in zip(p1, p2, status):
-#         if inlier:
-#             col = green
-#             cv2.circle(vis, (x1, y1), 2, col, -1)
-#             cv2.circle(vis, (x2, y2), 2, col, -1)
-#         else:
-#             col = red
-#             r = 2
-#             thickness = 3
-#             cv2.line(vis, (x1-r, y1-r), (x1+r, y1+r), col, thickness)
-#             cv2.line(vis, (x1-r, y1+r), (x1+r, y1-r), col, thickness)
-#             cv2.line(vis, (x2-r, y2-r), (x2+r, y2+r), col, thickness)
-#             cv2.line(vis, (x2-r, y2+r), (x2+r, y2-r), col, thickness)
-#     vis0 = vis.copy()
-#     for (x1, y1), (x2, y2), inlier in zip(p1, p2, status):
-#         if inlier:
-#             cv2.line(vis, (x1, y1), (x2, y2), green)
-#
-#     cv2.imshow(win, vis)
+
+def match_and_draw(queryImageName, matcher, kp_dest_and_images_pairs):
+	print 'match_and_draw...'
+	queryImage = get_image(queryImageName)
+	queryKeypoints, queryDescriptors = get_image_features(queryImage)
+
+	for kpd in kp_dest_and_images_pairs:
+		trainKeypoints = kpd[0]
+		trainDescriptors = kpd[1]
+		trainImgSize = kpd[2]
+		h1 = numpy.int(trainImgSize[0])
+		w1 = numpy.int(trainImgSize[1])
+		trainImageName = kpd[3]
+		trainImage = kpd[4]
+
+		corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
+
+		print trainImageName," : ",len(trainKeypoints)
+		raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors, 2)
+		queryGoodKeypoints, trainGoodKeypoints, kp_pairs = m_and_d_filter_matches(trainKeypoints, queryKeypoints, raw_matches)
+
+		if len(trainGoodKeypoints) >= 25:
+			H, status = cv2.findHomography(queryGoodKeypoints, trainGoodKeypoints, cv2.RANSAC, 5.0)
+
+			#print "H: ", H
+			print '%s: %d / %d  inliers/matched,and the matched points is p1 = %d p2 = %d' % \
+				  (kpd[2],numpy.sum(status), len(status),len(queryGoodKeypoints),len(trainGoodKeypoints))
+		else:
+			H, status = None, None
+			print '%d matches found, not enough for homography estimation' % len(queryGoodKeypoints)
+
+		if H is not None:
+			corners = corners.reshape(1, -1, 2)
+			print  "corners : ", corners
+
+			obj_corners = numpy.int32(cv2.perspectiveTransform(corners,H).reshape(-1,2))
+			print "obj = " , obj_corners
+
+		explore_match(trainImageName, queryImage, trainImage, kp_pairs, status, H)
+
+
+def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = None):
+	h1, w1 = queryImage.shape[:2]
+	h2, w2 = trainImage.shape[:2]
+	vis = numpy.zeros((max(h1, h2), w1+w2), numpy.uint8)
+	vis[:h1, :w1] = queryImage
+	vis[:h2, w1:w1+w2] = trainImage
+	vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+
+	if H is not None:
+		corners = numpy.float32([[0, 0], [w2, 0], [w2, h2], [0, h2]])
+		corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2))
+		cv2.polylines(vis, [corners], True, (255, 255, 255))
+
+	if status is None:
+		status = numpy.ones(len(kp_pairs), numpy.bool_)
+	trainGKP = numpy.int32([kpp[1].pt for kpp in kp_pairs])		    #train good matched keypoints
+	queryGKP = numpy.int32([kpp[0].pt for kpp in kp_pairs]) + (w1, 0) #query good matched keypoints
+
+	green = (0, 255, 0)
+	red = (0, 0, 255)
+	white = (255, 255, 255)
+	kp_color = (51, 103, 236)
+	for (x1, y1), (x2, y2), inlier in zip(trainGKP, queryGKP, status):
+		if inlier:
+			col = green
+			cv2.circle(vis, (x1, y1), 2, col, -1)
+			cv2.circle(vis, (x2, y2), 2, col, -1)
+		else:
+			col = red
+			r = 2
+			thickness = 3
+			cv2.line(vis, (x1-r, y1-r), (x1+r, y1+r), col, thickness)
+			cv2.line(vis, (x1-r, y1+r), (x1+r, y1-r), col, thickness)
+			cv2.line(vis, (x2-r, y2-r), (x2+r, y2+r), col, thickness)
+			cv2.line(vis, (x2-r, y2+r), (x2+r, y2-r), col, thickness)
+	vis0 = vis.copy()
+	for (x1, y1), (x2, y2), inlier in zip(trainGKP, queryGKP, status):
+		if inlier:
+			cv2.line(vis, (x1, y1), (x2, y2), green)
+
+	cv2.imshow(visName, vis)
+
+	def onmouse(event, x, y, flags, param):
+		cur_vis = vis
+		if flags & cv2.EVENT_FLAG_LBUTTON:
+			cur_vis = vis0.copy()
+			r = 8
+			m = (anorm(trainGKP - (x, y)) < r) | (anorm(queryGKP - (x, y)) < r)
+			idxs = numpy.where(m)[0]
+			kp1s, kp2s = [], []
+			for i in idxs:
+				(x1, y1), (x2, y2) = trainGKP[i], queryGKP[i]
+				col = (red, green)[status[i]]
+				cv2.line(cur_vis, (x1, y1), (x2, y2), col)
+				kp1, kp2 = kp_pairs[i]
+				kp1s.append(kp1)
+				kp2s.append(kp2)
+			cur_vis = cv2.drawKeypoints(cur_vis, kp1s, flags=4, color=kp_color)
+			cur_vis[:, w1:] = cv2.drawKeypoints(cur_vis[:, w1:], kp2s, flags=4, color=kp_color)
+		cv2.imshow(visName, cur_vis)
+	cv2.setMouseCallback(visName, onmouse)
+
+	cv2.waitKey(0)
+
+	return vis
 
 def match(queryFeature, trainFeature, matcher, queryImage = None):
 	queryKeypoints = queryFeature[0]
@@ -246,14 +330,17 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 	trainImgHeight = trainImgSize[0]
 	trainImgWidth = trainImgSize[1]
 
+	red = (0, 0, 255)
+
 	corners = numpy.float32([[0,0],[trainImgWidth,0],[trainImgWidth,trainImgHeight],[0,trainImgHeight]])
 
-	raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors,2)
-	queryGoodPoints , trainGoodPoints, kp_pairs = filter_matches(trainKeypoints, queryKeypoints, raw_matches)
+	raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors, 2)
+	queryGoodPoints , trainGoodPoints = filter_matches(trainKeypoints, queryKeypoints, raw_matches)
 
 	if len(queryKeypoints) >= 4:
 		H, status = cv2.findHomography(queryGoodPoints, trainGoodPoints, cv2.RANSAC, 5.0)
 
+		print "H: ", H
 		print '%s: %d / %d  inliers/matched,and the matched points is p1 = %d p2 = %d' % (
 			trainImageName, numpy.sum(status), len(status), len(queryGoodPoints), len(trainGoodPoints))
 	else:
@@ -265,6 +352,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 		print  "corners : ", corners
 
 		obj_corners = numpy.int32(cv2.perspectiveTransform(corners, H).reshape(-1, 2))
+
 		print "obj = ", obj_corners
 
 
@@ -273,7 +361,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			vis = numpy.zeros((queryImgHeight, queryImgWidth), numpy.uint8)
 			vis[:queryImgHeight, :queryImgWidth] = queryImage
 			vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
-			cv2.polylines(vis, [obj_corners], True, (0, 0, 255))
+			cv2.polylines(vis, [obj_corners], True, red)
 			is_polygon = ispolygon(obj_corners)
 
 			if is_polygon:
@@ -285,7 +373,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
 
-def cosVector(x,y):
+def absCosVector(x,y):
 	l=len(x)
 	# len(x)
 	if(len(x)!=len(y)):
@@ -308,10 +396,9 @@ def cosVector(x,y):
 		# print "result2 = ",result2
 		# print "result3 = ",result3
 		# print("result is "+str(cosVec))
-		cosVec = result1 / ((result2 * result3) ** 0.5)
-		return cosVec
-
-
+		absCosVec = abs(result1 / ((result2 * result3) ** 0.5))
+		print "absCosVec = ", absCosVec
+		return absCosVec
 
 def vector(p1,p2):
 
@@ -325,12 +412,15 @@ def vector(p1,p2):
 		return
 
 def ispolygon(points):
-	vec1 = vector(points[0],points[1])
-	vec2 = vector(points[0],points[3])
-	vec3 = vector(points[1],points[2])
-	cos1 = cosVector(vec1,vec2)
-	cos2 = cosVector(vec1,vec3)
-	if cos1>-0.1 and cos1<0.1 and cos2>-0.1 and cos2<0.1:
+	vec1 = vector(points[0], points[1])
+	vec2 = vector(points[0], points[3])
+	vec3 = vector(points[1], points[2])
+	vec4 = vector(points[2], points[3])
+	absCos1 = absCosVector(vec1, vec2)
+	absCos2 = absCosVector(vec1, vec3)
+	absCos3 = absCosVector(vec1, vec4)
+	print "absCos3 = " ,absCos3
+	if absCos1 < 0.26  and absCos2 < 0.26 and absCos3 <= 1 and absCos3 > 0.96:
 		print "This area is polygon-like."
 		return True
 	else:
@@ -349,9 +439,9 @@ if __name__ == "__main__":
 	# ispolygon(points)
 
 	start_time = time.time()
-	flann_matcher,kps,dests,sizes = train_index()  #get matcher with a sequence of desciptors #!!
+	flann_matcher,kps,dests,sizes,images = train_index()  #get matcher with a sequence of desciptors #!!
 
-	kp_and_dest_pairs = zip(kps,dests,sizes,files)
+	kp_dest_and_images_pairs = zip(kps,dests,sizes,files,images)
 
 	#print kp_and_dest_pairs
 
@@ -371,24 +461,29 @@ if __name__ == "__main__":
 	# kp2, desc2 = surf.detectAndCompute(img2, None)
 	# raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
 
-	# ======================================================
+	# ================== first match test ===================
 
-	queryImage = get_image("t3.jpg")
+	queryImage = get_image("t1.jpg")
 	queryKeypoints, queryDescriptors = get_image_features(queryImage)
 	queryImgSize = queryImage.shape[:2]
-	queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t3.jpg"]
+	queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t1.jpg"]
 
-	trainImage = get_image("ad1.jpg")
+	trainImage = get_image("1.jpg")
 	trainKeypoints, trainDescriptors = get_image_features(trainImage)
 	trainImgSize = trainImage.shape[:2]
-	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "ad1.jpg"]
+	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "1.jpg"]
+
+	surf_extractor = cv2.DescriptorExtractor_create("SURF")
+
+  	#bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
 
 	match(queryFeature,trainFeature, matcher, queryImage)
-
-
-	# ======================================================
+	#======================================================
 	start_time = time.time()
 
-	match_image("t3.jpg", flann_matcher, kp_and_dest_pairs)
+	#================== second match test =================
+	#match_image("t1.jpg", flann_matcher, kp_dest_and_images_pairs)
 	print "Matching took", (time.time() - start_time), "s."
 
+	#================== third match test ==================
+	match_and_draw("t1.jpg", matcher, kp_dest_and_images_pairs)
