@@ -15,7 +15,7 @@ def get_image(image_path):
 def get_image_features(image):
 	# Workadound for missing interfaces
 	surf = cv2.FeatureDetector_create("SURF")
-	surf.setInt("hessianThreshold", 100)
+	surf.setInt("hessianThreshold", 200 )
 	surf_extractor = cv2.DescriptorExtractor_create("SURF")
 	# Get keypoints from image
 	keypoints = surf.detect(image, None)
@@ -116,7 +116,7 @@ def match_image(image, matcher, kp_and_dest_pairs):
 
 		#print '%s:' %kpd[2]
 
-		if len(p1) >= 25:
+		if len(p1) >= 15:
 			H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
 
 			print "H: ", H
@@ -140,7 +140,6 @@ def match_image(image, matcher, kp_and_dest_pairs):
 			vis[:h2, :w2] = queryImage
 			vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
 			cv2.polylines(vis, [obj_corners], True, (0, 0, 255))
-
 			# =================== test for cv2.polylines ===================
             # p1 = [100, 100]
             # p2 = [100, 200]
@@ -165,16 +164,12 @@ def match_image(image, matcher, kp_and_dest_pairs):
 				# cv2.line(vis, (x1 - r, y1 + r), (x1 + r, y1 - r), col, thickness)
             #
             # cv2.polylines(vis,[points],True,(0,255,255))
-
-
-
 			is_polygon = ispolygon(obj_corners)
+
 			if is_polygon:
 				print "This image may be matched!"
 			else:
 				print "This image may NOT be matched!"
-			#print math.sqrt((obj_corners[0].x - obj_corners[1].x) * (obj_corners[0].x - obj_corners[1].x) + (
-				#obj_corners[0].y - obj_corners[1].y) * (obj_corners[0].y - obj_corners[1].y))
 
 			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
@@ -229,7 +224,7 @@ def match_and_draw(queryImageName, matcher, kp_dest_and_images_pairs):
 		raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors, 2)
 		queryGoodKeypoints, trainGoodKeypoints, kp_pairs = m_and_d_filter_matches(trainKeypoints, queryKeypoints, raw_matches)
 
-		if len(trainGoodKeypoints) >= 25:
+		if len(trainGoodKeypoints) >= 15:
 			H, status = cv2.findHomography(queryGoodKeypoints, trainGoodKeypoints, cv2.RANSAC, 5.0)
 
 			#print "H: ", H
@@ -246,6 +241,13 @@ def match_and_draw(queryImageName, matcher, kp_dest_and_images_pairs):
 			obj_corners = numpy.int32(cv2.perspectiveTransform(corners,H).reshape(-1,2))
 			print "obj = " , obj_corners
 
+			is_polygon = ispolygon(obj_corners)
+
+			if is_polygon:
+				print "This image may be matched!"
+			else:
+				print "This image may NOT be matched!"
+
 		explore_match(trainImageName, queryImage, trainImage, kp_pairs, status, H)
 
 
@@ -260,7 +262,7 @@ def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = 
 	if H is not None:
 		corners = numpy.float32([[0, 0], [w2, 0], [w2, h2], [0, h2]])
 		corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2))
-		cv2.polylines(vis, [corners], True, (255, 255, 255))
+		cv2.polylines(vis, [corners], True, (0, 0, 255))
 
 	if status is None:
 		status = numpy.ones(len(kp_pairs), numpy.bool_)
@@ -380,9 +382,9 @@ def absCosVector(x,y):
 		print 'error input,x and y is not in the same space'
 		return -9
 
-	result1=0.0
-	result2=0.0
-	result3=0.0
+	result1 = 0.0
+	result2 = 0.0
+	result3 = 0.0
 
 	for i in range(l):
 		result1+=x[i]*y[i]	#sum(x * y)
@@ -397,7 +399,7 @@ def absCosVector(x,y):
 		# print "result3 = ",result3
 		# print("result is "+str(cosVec))
 		absCosVec = abs(result1 / ((result2 * result3) ** 0.5))
-		print "absCosVec = ", absCosVec
+		#print "absCosVec = ", absCosVec
 		return absCosVec
 
 def vector(p1,p2):
@@ -419,8 +421,12 @@ def ispolygon(points):
 	absCos1 = absCosVector(vec1, vec2)
 	absCos2 = absCosVector(vec1, vec3)
 	absCos3 = absCosVector(vec1, vec4)
-	print "absCos3 = " ,absCos3
-	if absCos1 < 0.26  and absCos2 < 0.26 and absCos3 <= 1 and absCos3 > 0.96:
+
+	print "absCos1 = ", absCos1
+	print "absCos2 = ", absCos2
+	print "absCos3 = ", absCos3
+
+	if absCos1 < 0.26  and absCos2 < 0.26 and absCos3 <= 1 and absCos3 > 0.95:
 		print "This area is polygon-like."
 		return True
 	else:
@@ -449,7 +455,7 @@ if __name__ == "__main__":
 	# ======================== Training done, image matching here ===============
 
 	FLANN_INDEX_KDTREE = 1
-	flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+	flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees=5)
 	matcher = cv2.FlannBasedMatcher(flann_params, {})
 
 	# surf = cv2.SURF()
@@ -486,4 +492,4 @@ if __name__ == "__main__":
 	print "Matching took", (time.time() - start_time), "s."
 
 	#================== third match test ==================
-	match_and_draw("t1.jpg", matcher, kp_dest_and_images_pairs)
+	match_and_draw("t4.jpg", matcher, kp_dest_and_images_pairs)
