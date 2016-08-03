@@ -1,8 +1,8 @@
-import cv2
+import cv
 import numpy
 
 # Used only for GUI
-import cv
+import cv2
 
 def get_image(image_path):
 	return cv2.imread(image_path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
@@ -30,6 +30,15 @@ if __name__ == "__main__":
 	# Draw keypoints on image
 	for keypoint in keypoints:
 		cv2.circle(image, (int(keypoint.pt[0]), int(keypoint.pt[1])), 2, (255, 0, 0))
+
+	img = cv2.imread('t1.jpg')
+
+	res = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
+	cv2.imwrite("/Users/chen/Documents/PyCharm/pyopencv_surf/img/test.jpg",res)
+
+	cv2.imshow("t1", res)
+
+	cv2.waitKey(0)
 
 	cv.NamedWindow("Car")
 	cv.ShowImage("Car", cv.fromarray(image))
