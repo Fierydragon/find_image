@@ -6,6 +6,8 @@ import os
 import time
 from common import anorm
 
+#TRAINDIR = 'img'
+TRAINDIR = 'test'
 files = []
 matcher = None
 
@@ -15,7 +17,7 @@ def get_image(image_path):
 def get_image_features(image):
 	# Workadound for missing interfaces
 	surf = cv2.FeatureDetector_create("SURF")
-	surf.setInt("hessianThreshold", 200 )
+	surf.setInt("hessianThreshold", 1000)
 	surf_extractor = cv2.DescriptorExtractor_create("SURF")
 	# Get keypoints from image
 	keypoints = surf.detect(image, None)
@@ -37,13 +39,13 @@ def train_index():
 	images = []
 
 	# Train FLANN matcher with descriptors of all images
-	for f in os.listdir("img/"):
+	for f in os.listdir(TRAINDIR):
 		# This step may produce a .DS_Store file in OS X system,Please remove the file in ./img folder.
 		print "Processing " + f
 
 		if f == ".DS_Store":
 			continue
-		image = get_image("./img/%s" % (f,))
+		image = get_image(TRAINDIR + "/%s" % (f,))
 		imgSize = image.shape[:2]
 
 		#gray = [cv2.cvtColor(i, cv2.COLOR_BGR2GRAY) for i in image]
@@ -308,8 +310,8 @@ def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = 
 				kp1, kp2 = kp_pairs[i]
 				kp1s.append(kp1)
 				kp2s.append(kp2)
-			cur_vis = cv2.drawKeypoints(cur_vis, kp1s, flags=4, color=kp_color)
-			cur_vis[:, w1:] = cv2.drawKeypoints(cur_vis[:, w1:], kp2s, flags=4, color=kp_color)
+			cur_vis = cv2.drawKeypoints(cur_vis, kp2s, flags=4, color=kp_color)
+			cur_vis[:, w1:] = cv2.drawKeypoints(cur_vis[:, w1:], kp1s, flags=4, color=kp_color)
 		cv2.imshow(visName, cur_vis)
 	cv2.setMouseCallback(visName, onmouse)
 
@@ -418,15 +420,25 @@ def ispolygon(points):
 	vec2 = vector(points[0], points[3])
 	vec3 = vector(points[1], points[2])
 	vec4 = vector(points[2], points[3])
-	absCos1 = absCosVector(vec1, vec2)
-	absCos2 = absCosVector(vec1, vec3)
-	absCos3 = absCosVector(vec1, vec4)
 
-	print "absCos1 = ", absCos1
-	print "absCos2 = ", absCos2
-	print "absCos3 = ", absCos3
+	absCos = []
+	absCos.append(absCosVector(vec1, vec2))
+	absCos.append(absCosVector(vec1, vec3))
+	absCos.append(absCosVector(vec1, vec4))
+	absCos.append(absCosVector(vec2, vec4))
+	absCos.append(absCosVector(vec2, vec3))
+	absCos.append(absCosVector(vec3, vec4))
+	approxVertical, approxHorizontal = 0, 0
+	for cosine in absCos:
+		if cosine < 0.26:
+			approxVertical = approxVertical + 1
+		if cosine >= 0.95 and cosine <= 1:
+			approxHorizontal = approxHorizontal + 1
 
-	if absCos1 < 0.26  and absCos2 < 0.26 and absCos3 <= 1 and absCos3 > 0.95:
+	print "absCos = ", absCos
+	print "approxVertical[2,4]: ", approxVertical
+	print "approxHorizontal[1,2]: ", approxHorizontal
+	if approxVertical >= 2  and approxVertical <= 4 and approxHorizontal >= 1 and approxHorizontal <= 2:
 		print "This area is polygon-like."
 		return True
 	else:
@@ -492,4 +504,4 @@ if __name__ == "__main__":
 	print "Matching took", (time.time() - start_time), "s."
 
 	#================== third match test ==================
-	match_and_draw("t4.jpg", matcher, kp_dest_and_images_pairs)
+	match_and_draw("IMG1.jpg", matcher, kp_dest_and_images_pairs)
