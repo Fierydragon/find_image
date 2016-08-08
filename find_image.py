@@ -43,13 +43,13 @@ def train_index():
 	images = []
 
 	# Train FLANN matcher with descriptors of all images
-	for f in os.listdir(TEST2):
+	for f in os.listdir(TRAINDIR):
 		# This step may produce a .DS_Store file in OS X system,Please remove the file in ./img folder.
 		print "Processing " + f
 
 		if f == ".DS_Store":
 			continue
-		image = get_image(TEST2 + "/%s" % (f,))
+		image = get_image(TRAINDIR + "/%s" % (f,))
 		imgSize = image.shape[:2]
 
 		#gray = [cv2.cvtColor(i, cv2.COLOR_BGR2GRAY) for i in image]
@@ -381,6 +381,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
 
+
 def absCosVector(x,y):
 	l=len(x)
 	# len(x)
@@ -408,8 +409,8 @@ def absCosVector(x,y):
 		#print "absCosVec = ", absCosVec
 		return absCosVec
 
-def vector(p1,p2):
 
+def vector(p1,p2):
 	if len(p1) == len(p2):
 		v = []
 		for i in range(len(p1)):
@@ -418,6 +419,7 @@ def vector(p1,p2):
 	else:
 		print "Error:len(p1) != len(p2)"
 		return
+
 
 def isConvexQuadrilateral(points):
 	(x1, y1), (x2, y2), (x3, y3), (x4, y4) = points
@@ -441,37 +443,47 @@ def pointSlopeForm(point1, point2):
 	(x1, y1) = point1
 	(x2, y2) = point2
 	if x1 != x2:
-		k = (y2 - y1) / (x2 - x1)
+		k = float((y2 - y1)) / float((x2 - x1))
 		b = y1 - k * x1
 
 	return k, b
 
+
 def isTogather(k, b, point1, point2):
-    (x1, y1) = point1
-    (x2, y2) = point2
-    v1 = y1 - k * x1 - b
-    v2 = y2 - k * x2 - b
-
-    if v1*v2 < 0:
-        return  True
-    else:
-        return False
-
-def isTogather2(b, point1, point2):
 	(x1, y1) = point1
 	(x2, y2) = point2
-	v1 = x1 - b
-	v2 = x2 - b
-	if v1 * v2 < 0:
-		return True
+	v1 = int(y1 - k * x1 - b)
+	v2 = int(y2 - k * x2 - b)
+
+	print "v1,v2 = " , v1,v2
+
+	if v1 != 0 and v2 != 0:
+		if v1^v2 < 0:
+			print "v1^v2 = ",v1^v2
+			return  True
+		else:
+			return False
 	else:
 		return False
 
 
+def isTogather2(b, point1, point2):
+	(x1, y1) = point1
+	(x2, y2) = point2
+	v1 = int(x1 - b)
+	v2 = int(x2 - b)
+
+	if v1 != 0 and v2 != 0:
+		if v1^v2 < 0:
+			return  True
+		else:
+			return False
+	else:
+		return False
 
 
 def ispolygon(points):
-
+	print "isConvexQuadrilateral: ", isConvexQuadrilateral(points)
 	if isConvexQuadrilateral(points):
 		vec1 = vector(points[0], points[1])
 		vec2 = vector(points[0], points[3])
@@ -542,21 +554,21 @@ if __name__ == "__main__":
 
 	# ================== first match test ===================
 
-	queryImage = get_image("t1.jpg")
-	queryKeypoints, queryDescriptors = get_image_features(queryImage)
-	queryImgSize = queryImage.shape[:2]
-	queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t1.jpg"]
-
-	trainImage = get_image("1.jpg")
-	trainKeypoints, trainDescriptors = get_image_features(trainImage)
-	trainImgSize = trainImage.shape[:2]
-	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "1.jpg"]
-
-	surf_extractor = cv2.DescriptorExtractor_create("SURF")
-
-  	#bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
-
-	match(queryFeature,trainFeature, matcher, queryImage)
+	# queryImage = get_image("t1.jpg")
+	# queryKeypoints, queryDescriptors = get_image_features(queryImage)
+	# queryImgSize = queryImage.shape[:2]
+	# queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t1.jpg"]
+    #
+	# trainImage = get_image("1.jpg")
+	# trainKeypoints, trainDescriptors = get_image_features(trainImage)
+	# trainImgSize = trainImage.shape[:2]
+	# trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "1.jpg"]
+    #
+	# surf_extractor = cv2.DescriptorExtractor_create("SURF")
+    #
+  	# #bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
+    #
+	# match(queryFeature,trainFeature, matcher, queryImage)
 	#======================================================
 	start_time = time.time()
 
@@ -565,4 +577,4 @@ if __name__ == "__main__":
 	print "Matching took", (time.time() - start_time), "s."
 
 	#================== third match test ==================
-	match_and_draw(UPLOAD + '/upload9.jpg', matcher, kp_dest_and_images_pairs)
+	match_and_draw('245-145.jpg', matcher, kp_dest_and_images_pairs)
