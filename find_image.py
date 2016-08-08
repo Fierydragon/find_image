@@ -455,8 +455,6 @@ def isTogather(k, b, point1, point2):
 	v1 = int(y1 - k * x1 - b)
 	v2 = int(y2 - k * x2 - b)
 
-	print "v1,v2 = " , v1,v2
-
 	if v1 != 0 and v2 != 0:
 		if v1^v2 < 0:
 			print "v1^v2 = ",v1^v2
@@ -483,7 +481,6 @@ def isTogather2(b, point1, point2):
 
 
 def ispolygon(points):
-	print "isConvexQuadrilateral: ", isConvexQuadrilateral(points)
 	if isConvexQuadrilateral(points):
 		vec1 = vector(points[0], points[1])
 		vec2 = vector(points[0], points[3])

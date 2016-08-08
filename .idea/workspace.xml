@@ -26,8 +26,8 @@
       <file leaf-file-name="find_image.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/find_image.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="214">
-              <caret line="469" column="17" selection-start-line="469" selection-start-column="16" selection-end-line="469" selection-end-column="17" />
+            <state relative-caret-position="136">
+              <caret line="482" column="22" selection-start-line="482" selection-start-column="22" selection-end-line="482" selection-end-column="22" />
               <folding>
                 <element signature="e#24#34#0" expanded="true" />
               </folding>
@@ -63,8 +63,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="1159" />
-    <option name="y" value="467" />
+    <option name="x" value="1264" />
+    <option name="y" value="413" />
     <option name="width" value="1275" />
     <option name="height" value="868" />
   </component>
@@ -385,7 +385,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1159" y="467" width="1275" height="868" extended-state="0" />
+    <frame x="1264" y="413" width="1275" height="868" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.27450982" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
@@ -428,12 +428,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/find_image.py</url>
-          <line>510</line>
+          <line>507</line>
           <option name="timeStamp" value="55" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/find_image.py</url>
-          <line>459</line>
+          <line>457</line>
           <option name="timeStamp" value="59" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
@@ -443,7 +443,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/find_image.py</url>
-          <line>486</line>
+          <line>483</line>
           <option name="timeStamp" value="63" />
         </line-breakpoint>
       </breakpoints>
@@ -771,8 +771,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/find_image.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="214">
-          <caret line="469" column="17" selection-start-line="469" selection-start-column="16" selection-end-line="469" selection-end-column="17" />
+        <state relative-caret-position="136">
+          <caret line="482" column="22" selection-start-line="482" selection-start-column="22" selection-end-line="482" selection-end-column="22" />
           <folding>
             <element signature="e#24#34#0" expanded="true" />
           </folding>
