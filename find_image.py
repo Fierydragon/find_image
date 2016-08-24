@@ -11,7 +11,7 @@ from common import anorm
 TRAINDIR = 'test'
 TEST2 = 'test2'
 UPLOAD = 'upload'
-
+CLASSIFY_TEST = "../resize/classifyResult/errorMatched/方太洗碗机"
 files = []
 matcher = None
 
@@ -21,7 +21,7 @@ def get_image(image_path):
 def get_image_features(image):
 	# Workadound for missing interfaces
 	surf = cv2.FeatureDetector_create("SURF")
-	surf.setInt("hessianThreshold", 400)
+	surf.setInt("hessianThreshold", 200)
 	surf_extractor = cv2.DescriptorExtractor_create("SURF")
 	# Get keypoints from image
 	keypoints = surf.detect(image, None)
@@ -43,13 +43,13 @@ def train_index():
 	images = []
 
 	# Train FLANN matcher with descriptors of all images
-	for f in os.listdir(TEST2):
+	for f in os.listdir(TRAINDIR):
 		# This step may produce a .DS_Store file in OS X system,Please remove the file in ./img folder.
 		print "Processing " + f
 
 		if f == ".DS_Store":
 			continue
-		image = get_image(TEST2 + "/%s" % (f,))
+		image = get_image(TRAINDIR + "/%s" % (f,))
 		imgSize = image.shape[:2]
 
 		#gray = [cv2.cvtColor(i, cv2.COLOR_BGR2GRAY) for i in image]
@@ -230,7 +230,7 @@ def match_and_draw(queryImageName, matcher, kp_dest_and_images_pairs):
 		raw_matches = matcher.knnMatch(trainDescriptors, queryDescriptors, 2)
 		queryGoodKeypoints, trainGoodKeypoints, kp_pairs = m_and_d_filter_matches(trainKeypoints, queryKeypoints, raw_matches)
 
-		if len(trainGoodKeypoints) >= 15:
+		if len(trainGoodKeypoints) > 15:
 			H, status = cv2.findHomography(queryGoodKeypoints, trainGoodKeypoints, cv2.RANSAC, 5.0)
 
 			#print "H: ", H
@@ -278,6 +278,7 @@ def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = 
 	green = (0, 255, 0)
 	red = (0, 0, 255)
 	white = (255, 255, 255)
+	blue = (255, 0, 0)
 	kp_color = (51, 103, 236)
 	for (x1, y1), (x2, y2), inlier in zip(trainGKP, queryGKP, status):
 		if inlier:
@@ -304,7 +305,7 @@ def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = 
 		if flags & cv2.EVENT_FLAG_LBUTTON:
 			cur_vis = vis0.copy()
 			r = 8
-			m = (anorm(trainGKP - (x, y)) < r) | (anorm(queryGKP - (x, y)) < r)
+			m = (anorm(trainGKP - (x, y)) < r) | (anorm(queryGKP - (x, y)) < r) # trainGKP: good matched key points.
 			idxs = numpy.where(m)[0]
 			kp1s, kp2s = [], []
 			for i in idxs:
@@ -314,8 +315,8 @@ def explore_match(visName, queryImage, trainImage, kp_pairs, status = None, H = 
 				kp1, kp2 = kp_pairs[i]
 				kp1s.append(kp1)
 				kp2s.append(kp2)
-			cur_vis = cv2.drawKeypoints(cur_vis, kp2s, flags=4, color=kp_color)
-			cur_vis[:, w1:] = cv2.drawKeypoints(cur_vis[:, w1:], kp1s, flags=4, color=kp_color)
+			cur_vis = cv2.drawKeypoints(cur_vis, kp2s, flags=4, color=blue)
+			cur_vis[:, w1:] = cv2.drawKeypoints(cur_vis[:, w1:], kp1s, flags=4, color=blue)
 		cv2.imshow(visName, cur_vis)
 	cv2.setMouseCallback(visName, onmouse)
 
@@ -381,6 +382,7 @@ def match(queryFeature, trainFeature, matcher, queryImage = None):
 			cv2.imshow(trainImageName, vis)
 			cv2.waitKey()
 
+
 def absCosVector(x,y):
 	l=len(x)
 	# len(x)
@@ -393,9 +395,9 @@ def absCosVector(x,y):
 	result3 = 0.0
 
 	for i in range(l):
-		result1+=x[i]*y[i]	#sum(x * y)
-		result2+=x[i]**2	#sum(x * x)
-		result3+=y[i]**2	#sum(y * y)
+		result1 += float(x[i]*y[i])	#sum(x * y)
+		result2 += x[i]**2	#sum(x * x)
+		result3 += y[i]**2	#sum(y * y)
 
 	if result2 == 0 or result3 == 0:
 		return -10
@@ -408,8 +410,8 @@ def absCosVector(x,y):
 		#print "absCosVec = ", absCosVec
 		return absCosVec
 
-def vector(p1,p2):
 
+def vector(p1,p2):
 	if len(p1) == len(p2):
 		v = []
 		for i in range(len(p1)):
@@ -418,6 +420,7 @@ def vector(p1,p2):
 	else:
 		print "Error:len(p1) != len(p2)"
 		return
+
 
 def isConvexQuadrilateral(points):
 	(x1, y1), (x2, y2), (x3, y3), (x4, y4) = points
@@ -441,37 +444,44 @@ def pointSlopeForm(point1, point2):
 	(x1, y1) = point1
 	(x2, y2) = point2
 	if x1 != x2:
-		k = (y2 - y1) / (x2 - x1)
+		k = float((y2 - y1)) / float((x2 - x1))
 		b = y1 - k * x1
 
 	return k, b
 
+
 def isTogather(k, b, point1, point2):
-    (x1, y1) = point1
-    (x2, y2) = point2
-    v1 = y1 - k * x1 - b
-    v2 = y2 - k * x2 - b
-
-    if v1*v2 < 0:
-        return  True
-    else:
-        return False
-
-def isTogather2(b, point1, point2):
 	(x1, y1) = point1
 	(x2, y2) = point2
-	v1 = x1 - b
-	v2 = x2 - b
-	if v1 * v2 < 0:
-		return True
+	v1 = int(y1 - k * x1 - b)
+	v2 = int(y2 - k * x2 - b)
+
+	if v1 != 0 and v2 != 0:
+		if v1^v2 < 0:
+			print "v1^v2 = ",v1^v2
+			return  True
+		else:
+			return False
 	else:
 		return False
 
 
+def isTogather2(b, point1, point2):
+	(x1, y1) = point1
+	(x2, y2) = point2
+	v1 = int(x1 - b)
+	v2 = int(x2 - b)
+
+	if v1 != 0 and v2 != 0:
+		if v1^v2 < 0:
+			return  True
+		else:
+			return False
+	else:
+		return False
 
 
 def ispolygon(points):
-
 	if isConvexQuadrilateral(points):
 		vec1 = vector(points[0], points[1])
 		vec2 = vector(points[0], points[3])
@@ -488,7 +498,7 @@ def ispolygon(points):
 		absCos.append(absCosVector(vec3, vec4))
 		approxVertical, approxHorizontal = 0, 0
 		for cosine in absCos:
-			if cosine < 0.26:
+			if cosine < 0.35:
 				approxVertical = approxVertical + 1
 			if cosine >= 0.95 and cosine <= 1:
 				approxHorizontal = approxHorizontal + 1
@@ -542,21 +552,21 @@ if __name__ == "__main__":
 
 	# ================== first match test ===================
 
-	queryImage = get_image("t1.jpg")
-	queryKeypoints, queryDescriptors = get_image_features(queryImage)
-	queryImgSize = queryImage.shape[:2]
-	queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t1.jpg"]
-
-	trainImage = get_image("1.jpg")
-	trainKeypoints, trainDescriptors = get_image_features(trainImage)
-	trainImgSize = trainImage.shape[:2]
-	trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "1.jpg"]
-
-	surf_extractor = cv2.DescriptorExtractor_create("SURF")
-
-  	#bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
-
-	match(queryFeature,trainFeature, matcher, queryImage)
+	# queryImage = get_image("t1.jpg")
+	# queryKeypoints, queryDescriptors = get_image_features(queryImage)
+	# queryImgSize = queryImage.shape[:2]
+	# queryFeature = [queryKeypoints, queryDescriptors, queryImgSize, "t1.jpg"]
+    #
+	# trainImage = get_image("1.jpg")
+	# trainKeypoints, trainDescriptors = get_image_features(trainImage)
+	# trainImgSize = trainImage.shape[:2]
+	# trainFeature = [trainKeypoints, trainDescriptors , trainImgSize, "1.jpg"]
+    #
+	# surf_extractor = cv2.DescriptorExtractor_create("SURF")
+    #
+  	# #bowDE = cv2.BOWImgDescriptorExtractor(surf_extractor, matcher)
+    #
+	# match(queryFeature,trainFeature, matcher, queryImage)
 	#======================================================
 	start_time = time.time()
 
@@ -565,4 +575,4 @@ if __name__ == "__main__":
 	print "Matching took", (time.time() - start_time), "s."
 
 	#================== third match test ==================
-	match_and_draw(UPLOAD + '/upload9.jpg', matcher, kp_dest_and_images_pairs)
+	match_and_draw(os.path.join(CLASSIFY_TEST, 'IMG_20160728_183259_1.jpg'), matcher, kp_dest_and_images_pairs)
