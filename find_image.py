@@ -575,4 +575,5 @@ if __name__ == "__main__":
 	print "Matching took", (time.time() - start_time), "s."
 
 	#================== third match test ==================
-	match_and_draw(os.path.join(CLASSIFY_TEST, 'IMG_20160728_183259_1.jpg'), matcher, kp_dest_and_images_pairs)
+	path = os.path.join(CLASSIFY_TEST, 'IMG_20160728_183259_1.jpg')
+	match_and_draw(path, matcher, kp_dest_and_images_pairs)
